@@ -1,0 +1,39 @@
+{
+    "manifest_version": 2,
+    "name": "ZenYouTubeFeed",
+    "version": "1.0",
+    "description": "a better YouTube experience.",
+    "browser_specific_settings": {
+        "gecko": {
+          "id": "google-user-info@mozilla.org",
+          "strict_min_version": "53a1"
+        }
+    },
+
+    "icons": {
+        "48": "icons/zen.jpg"
+    },
+
+    "permissions": [
+        "activeTab", 
+        "tabs"
+    ],
+
+    "browser_action": {
+        "browser_style": true,
+        "default_icon": "icons/zen-1.jpg",
+        "default_title": "ZenYouTubeFeed"
+    },
+
+    "background": {
+        "scripts": ["background/bg.js"],
+        "persistent": false
+    },
+
+    "content_scripts": [
+        {
+            "matches": ["*://*.youtube.com/*"],
+            "js": ["zen_youtube_feed.js"]
+        }
+    ]
+}
