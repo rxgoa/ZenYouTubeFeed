@@ -1,5 +1,4 @@
 console.log("bg script loaded!");
-
 var sender_id = 0;
 
 function listingDOM(message, sender, sendResponse){

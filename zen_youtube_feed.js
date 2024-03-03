@@ -148,8 +148,7 @@ function styleCreation(){
     display: flex;
     overflow-x: auto;
     white-space: nowrap;
-    padding: 20px;
-    
+    padding: 20px;    
   }
 
   .column {
