@@ -3,14 +3,8 @@ console.log("\n\ncontent_script loaded!!\n\n");
 function listingBackgroundScript(message, sender, response) {
     if(message.type === "REQUESTED_DOM_INFO") {
         console.log(`Background Script requested DOM info..`);        
-        
-        var videos = getVideos();    
-        var customHtml = orchestradeCreation(videos);        
-        var originalHtml = document.querySelector(`[page-subtype="subscriptions"]`);
-        
-        console.log(customHtml);
-        replaceHTMLContent(originalHtml, customHtml);        
-        browser.runtime.sendMessage({ type: "USER_ACTION_FULFILLED", data: videos})
+        process(); 
+        browser.runtime.sendMessage({ type: "USER_ACTION_FULFILLED" })
     }
 
     if(message.type === "REPLACE_HTML"){
@@ -38,7 +32,7 @@ function getVideos() {
 
     // function responsible for getting all the videos from an specific row
     function getVideosFromRowList(rowsList) {
-        //var rowsList = Array.from(rows);
+
         console.log("\n\nGetting list of videos from rows...\n\n");
         var videos = [];
         
@@ -49,12 +43,16 @@ function getVideos() {
                 var videoObject = {
                     title: video.children[0].children[0].children[0].children[2].children[1].children[0].children[1].textContent,
                     url: video.children[0].children[0].children[0].children[2].children[1].children[0].children[1].href,
-                    channel_image: default_image !== "" ? default_image : "https://i.pinimg.com/736x/04/47/8e/04478e52900c30a49c4d4e9a312725b3.jpg",
+                    channel_image: default_image !== "" ? default_image : "",
+                    //channel_image: default_image !== "" ? default_image : "https://i.pinimg.com/736x/04/47/8e/04478e52900c30a49c4d4e9a312725b3.jpg",
+                    channel_url: video.children[0].children[0].children[0].children[2].children[1].children[1].children[0].children[0].children[0].children[0].children[0].children[0].children[0].href,
                     channel_name: video.children[0].children[0].children[0].children[2].children[1].children[1].children[0].children[0].innerText,
                     date: video.children[0].children[0].children[0].children[2].children[1].children[1].children[0].children[1].innerText,
                     category: "DEFAULT_CATEGORY"
-                };                
+                };
+
                 videos.push(videoObject);
+
             });
         });
 
@@ -66,11 +64,68 @@ function getVideos() {
 
     var rows = getRows();
     var videosList = getVideosFromRowList(rows);
+    var videosListWithImages = checkIfImageExist(videosList);
 
-    return videosList;
+    return videosListWithImages;
 }
 
+function setChannelsCache(videos){
 
+    var localStorage = getLocalStorage();
+   
+    videos.forEach(video => {
+            
+            var checkChannel = localStorage.findIndex(channel => channel.channel_url === video.channel_url);
+            if(checkChannel === -1) {
+                if(video.channel_image !== "") {
+                    console.log("Setting channel cache.....");
+                    localStorage.push({
+                        name: video.channel_name,
+                        image_url: video.channel_image,
+                        channel_url: video.channel_url
+                    });
+               }
+            }
+    });
+
+    setStorage(localStorage);
+
+}
+
+function checkIfImageExist(videos){
+
+    var localStorage = getLocalStorage();
+   
+    videos.forEach(video => {
+            
+            var checkChannel = localStorage.findIndex(channel => channel.channel_url === video.channel_url);
+            if(checkChannel !== -1) {
+                if(video.channel_image === "") {
+                    video.channel_image = localStorage[checkChannel].image_url;
+               }
+            }
+    });
+
+    return videos;
+
+}
+
+function setStorage(updatedStorage) {
+    localStorage.setItem('zen-youtube-feed', JSON.stringify(updatedStorage));
+}
+
+function getLocalStorage(){
+    var storage = localStorage.getItem('zen-youtube-feed');
+    if(storage) {
+        console.log("Storage was found.. returning data.");
+        var storageParsed = JSON.parse(storage);
+        console.log(storageParsed);
+        return storageParsed;
+    } else {
+        console.log("Storage doesn't exist.");
+        return [];
+    }
+}
 
 function containerCreation(){
     var htmlContainer = '';
@@ -99,7 +154,7 @@ function cardsCreation(video){
      htmlCard += `<div class="card">`;
 
      function image(){
-        htmlCard += `<div class="card-image"><img src="${video.channel_image}" class="centered-image" alt="Profile Image"></div>`
+        htmlCard += `<div class="card-image"><img src="${video.channel_image !== "" ? video.channel_image : 'https://i.pinimg.com/736x/04/47/8e/04478e52900c30a49c4d4e9a312725b3.jpg'}" class="centered-image" alt="Profile Image"></div>`
      }
 
      function content() {
@@ -182,7 +237,7 @@ function styleCreation(){
   }
 
   .card-image {
-    border-radius: 50%;
+    border-radius: 6px;
     overflow: hidden;
     width: 50px; /* Set your preferred image size */
     height: 50px; /* Set your preferred image size */
@@ -266,6 +321,16 @@ function orchestradeCreation(videos){
     return finalHtml;
 }
 
+function process() {
+    var videos = getVideos();
+    // set cache of channels
+    setChannelsCache(videos);
+
+    var customHtml = orchestradeCreation(videos); 
+    var originalHtml = document.querySelector(`[page-subtype="subscriptions"]`);        
+    replaceHTMLContent(originalHtml, customHtml);
+}
+
 function replaceHTMLContent(originalHtml, customHTML) {    
     originalHtml.innerHTML = "";
     originalHtml.innerHTML = customHTML;
@@ -274,10 +339,7 @@ function replaceHTMLContent(originalHtml, customHTML) {
 function checkClickEvent(event){    
     if(event.target.innerText === "Subscriptions") {                
         console.log("Subscription menu button was clicked!!!!");        
-        var videos = getVideos();
-        var customHtml = orchestradeCreation(videos); 
-        var originalHtml = document.querySelector(`[page-subtype="subscriptions"]`);        
-        replaceHTMLContent(originalHtml, customHtml);
+        process(); 
     }
 }
 

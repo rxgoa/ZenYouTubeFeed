@@ -10,7 +10,6 @@ function listingDOM(message, sender, sendResponse){
 
     if(message.type === "USER_ACTION_FULFILLED"){        
         console.log(message.type);       
-        console.log(message);
     }
 
 }
