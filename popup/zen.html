@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="zen.css" />
+  </head>
+
+  <body>
+    <div id="popup-content">
+      <div id="homeScreen">
+        <button>Zen</button>
+        <button name="show_categories">Show Categories</button>
+        <button name="add_category">Add Category</button>
+      </div>
+      <div id="addCategoryScreen" style="visibility: hidden;">
+        <input type="text" id="categoryInput" placeholder="New Category"/>
+        <button name="create">Create</button>
+      </div>
+      <div id="categoriesScreen" style="visibility: hidden;">
+        <button id="backBtn" name="back">&lt;- Back</button>
+        <ul id="categoriesList">
+          <!-- Categories will be listed here -->
+        </ul>
+      </div>
+    </div>
+    <script src="zen.js"></script>
+  </body>
+</html>
+
