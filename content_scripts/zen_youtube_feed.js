@@ -111,13 +111,11 @@ function getVideos() {
 }
 
 function setChannelsCache(videos){
-
         var localStorage = getLocalStorage('zen-youtube-feed');
         videos.forEach(video => {
             var checkChannel = localStorage.findIndex(channel => channel.channel_url === video.channel_url);
             if(checkChannel === -1) {
                 if(video.channel_image !== "") {
-                    console.log("Setting channel cache.....");
                     localStorage.push({
                         name: video.channel_name,
                         image_url: video.channel_image,
@@ -132,7 +130,6 @@ function setChannelsCache(videos){
 }
 
 function checkIfImageExist(videos){
-
     var localStorage = getLocalStorage('zen-youtube-feed');
 
     if(localStorage.length > 0) {
@@ -153,6 +150,30 @@ function checkIfImageExist(videos){
 
 }
 
+function updateChannelCategoryDOM(event, channelName) {
+        event.srcElement.parentNode.parentNode.children[0].innerHTML = `<button class="dropbtn">${event.target.textContent}</button>`;
+        // update localStorage channel
+        let allChannelVideos = Array.from(document.getElementsByClassName("card-channel"));
+
+
+        let onlyCurrentChannelVideos = allChannelVideos.filter(video => video.textContent === channelName);
+        onlyCurrentChannelVideos.forEach((channel) => {
+            //channel.parentNode.parentNode.parentNode.children[1].children[1]
+            channel.parentNode.parentNode.parentNode.children[1].children[0].innerHTML = `<button class="dropbtn">${event.target.textContent}</button>`;
+        });
+}
+
+function setChannelCategory(updatedChannel){
+    let localStorage = getLocalStorage('zen-youtube-feed');
+    localStorage.forEach((channel) => {
+        if(channel.name === updatedChannel.name) {
+                channel.category = updatedChannel.category;
+        }
+    });
+    setStorage(localStorage, 'zen-youtube-feed');
+
+}
+
 function setStorage(updatedStorage, storageName) {
     localStorage.setItem(storageName, JSON.stringify(updatedStorage));
 }
@@ -163,7 +184,11 @@ function getLocalStorage(storageName){
         var storageParsed = JSON.parse(storage);
         return storageParsed;
     } else {
-        return {};
+        if(storageName === 'zen-youtube-feed') {
+            return [];
+        } else if(storageName === 'zen-options') {
+            return {};
+        }
     }
 }
 
@@ -175,17 +200,86 @@ function containerCreation(){
 }
 
 // when implementa more than one column, im going to need to think better about how to close divs.
-function columnsCreation(){
-    var htmlColumn = '';
-    htmlColumn += `<div class="column">`;
+function columnsCreation(isNew){
+    let columns = getLocalStorage('zen-options');
 
-    function title() {
-        htmlColumn += `<h2 class="column-title">_feed_</h2>`;
+    var htmlColumn = '';
+
+    function title(name, videos) {
+           htmlColumn += `<div class="column">`;
+           htmlColumn += `<h2 class="column-title">${name}</h2>`;
+           videos.forEach(video => {
+                var card = cardsCreation(video);
+                htmlColumn += card;
+           });
+           htmlColumn += `</div>`;
     }
 
-    title();
+    function dropdown(category) {
+            if(!category){
+                    category = {};
+            }
+            htmlColumn += createDropdown(category);
+    }
+
+    function loadCategory() {
+           htmlColumn += `<button class="new-column-load-btn">Load Category</button>`;
+    }
+
+    if(isNew) {
+        dropdown({});
+        loadCategory();
+    } else {    
+         let videos = getVideos();
+         if(columns.columns) {         
+             let videosWithoutCategory = videos.filter(video => !video.category || video.category === "");
+             console.log("videos without category");
+             console.log(videosWithoutCategory);             
+             title("_feed_", videosWithoutCategory);
+
+             columns.columns.forEach((column) => {
+
+                htmlColumn += `<div class="column">`;   
+
+                dropdown({ category: column.name });
+                loadCategory();
+
+
+                let videosWithCategory = videos.filter(video => video.category);
+                console.log("video with category");
+                console.log(videosWithCategory);
+
+                videosWithCategory.forEach((video, index) => {
+                    if(video.category === column.name) {
+                        var card = cardsCreation(video);
+                        htmlColumn += card;
+                    }
+                });
+
+                //insertVideosInColumns(videos);
+                // insert all videos from this particulary category....
+                    //
+                    //
+                    //
+                    //
+                    //
+                    //
+                    //
+                    //
+                    //
+                htmlColumn += `</div>`;
+            });
+        } else {
+
+          title("_feed_");
+
+        }
+    }        
+
+ // htmlColumn += `</div>`;
 
     return htmlColumn;
+      
 }
 
 function cardsCreation(video){
@@ -226,28 +320,37 @@ function cardsCreation(video){
 
 
      htmlCard += `</a>`;          
-     if(video.category && video.category !== "") {
-        htmlCard += `<span class="pill">${video.category}</span>`;
-     } else {
-        let extensionOptions = getLocalStorage('zen-options');
-        htmlCard += `
-                <div class="dropdown">
-                  <button class="dropbtn">Select Category ( ͡° ͜ʖ ͡°)</button>
-                <div class="dropdown-content">
-        `;
-        extensionOptions.categories.forEach((category) => {
-            htmlCard += `
-                 <a href="#">${category.name}</a>
-            `;
+     let dropdown = createDropdown(video);
+     htmlCard += dropdown;
 
-        });
-        htmlCard += "</div>";
-        htmlCard += "</div>";
-     }
+
      htmlCard += `</div>`;
 
      return htmlCard;
 
+}
+
+function createDropdown(video) {
+     let extensionOptions = getLocalStorage('zen-options');
+     let htmlCard = `
+                <div class="dropdown">
+                  <button class="dropbtn">${video.category && video.category !== "" ? video.category : "Select Category ( ͡° ͜ʖ ͡°)"}</button>
+                <div class="dropdown-content">
+      `;
+
+     extensionOptions.categories.forEach((category) => {
+           if(video.category !== category.name) {
+               htmlCard += `
+                    <a class="categorySelection">${category.name}</a>
+               `;
+           }
+
+     });
+         
+     htmlCard += "</div>";
+     htmlCard += "</div>";
+
+    return htmlCard;
 }
 
 function styleCreation(){
@@ -262,25 +365,41 @@ function styleCreation(){
 
   .scrollable-container {
     display: flex;
-    overflow-x: auto;
+    overflow-x: scroll;
     white-space: nowrap;
+    width: 100%;
     padding: 20px;    
+    height: 88vh;
+    scrollbar-color: #D22B2B #F6FBFC;
+    scrollbar-width: auto;
+  }
+  .new-column {
+    width: 300px;
+    height: 30px;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 
   .column {
     flex-shrink: 0;
     width: 300px; /* Set your preferred column width */
     margin-right: 20px; /* Adjust spacing between columns */
-    background-color: #F4FDFF;
+    background-color: rgba(244, 251, 252, 0.8);
+    border: rgba(182, 175, 172, 0.03) 3px solid;
     border-radius: 8px;
     padding: 20px;
+    overflow-y: scroll;
+    scrollbar-color: #D22B2B #F6FBFC;
+    scrollbar-width: thin;
   }
 
   .card {    
     border-radius: 8px;
     padding: 10px;
     min-height: 60px;
-    max-height: 92px;
+    max-height: 98px;
     margin-bottom: 20px; /* Adjust spacing between cards */
     box-shadow: 0 0 14px rgba(0, 0, 0, 0.04);
     background-color: #fff;
@@ -298,25 +417,48 @@ function styleCreation(){
     background-color: #FFDFD3;
 }
 
-/* Container for the dropdown */
 .dropdown {
   position: relative;
   display: inline-block;
   margin-top: 5px;
+  margin-bottom: 20px;
 }
 
 /* Button styling */
 .dropbtn {
-  background-color: #FF6961;
-  color: black;
-  padding: 4px 8px;
-  font-size: 8px;
+  background-color: #FFDFD3;
+  color: #333;
+  padding: 8px 16px;
+  font-size: 10px;
+  font-weight: bold;
   border: none;
   cursor: pointer;
   border-radius: 20px; /* Pill-style button */
 }
 
-/* Dropdown content */
+.new-column-load-btn {
+  background-color: #D22B2B;
+  color: white;
+  border: none;
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: bold;
+  margin-left: 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.new-column-load-btn:hover {
+  background-color: #c11a1a;
+  transform: translateY(-2px);
+}
+
+.new-column-load-btn:active {
+  transform: translateY(1px);
+}
+
 .dropdown-content {
   display: none;
   position: absolute;
@@ -326,21 +468,17 @@ function styleCreation(){
   z-index: 1;
 }
 
-/* Links inside the dropdown */
 .dropdown-content a {
   color: black;
-  padding: 12px 16px;
+  padding: 10px 16px;
   text-decoration: none;
   display: block;
 }
 
-/* Hover effect for the links */
 .dropdown-content a:hover {background-color:#D22B2B; color: white;}
 
-/* Show the dropdown content on hover */
 .dropdown:hover .dropdown-content {display: block}
 
-/* Change the background of the button when the dropdown is clicked */
 .dropdown:hover .dropbtn {background-color: #D22B2B;}
 
   .column a {
@@ -349,10 +487,14 @@ function styleCreation(){
 
   .column-title {
     font-size: 18px;
-    margin-bottom: 10px;
+    margin-bottom: 30px;
     text-align: center;
     color: #151922;
   }
+
+ .categorySelection {
+    cursor: pointer;
+ }
 
   .card-image {
     border-radius: 6px;
@@ -390,6 +532,27 @@ function styleCreation(){
     overflow: hidden;
   }
 
+.new-column-btn {
+  background-color: #D22B2B;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 5px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.new-column-btn:hover {
+  background-color: #c11a1a;
+  transform: translateY(-2px);
+}
+
+.new-column-btn:active {
+  transform: translateY(1px);
+}
   .card-time,
   .card-channel {
     width: 50%;
@@ -423,21 +586,35 @@ function orchestradeCreation(videos){
 
         var style = styleCreation();
         var container = containerCreation();
+        var newColumnBtn = `<div class="new-column"><button class="new-column-btn">New column</button></div>`;
         var columns = columnsCreation();
 
-        videos.forEach((video, index) => {
-            var card = cardsCreation(video);
-            cards += card;
-        });
 
-        finalHtml += style;
+
+        finalHtml += style;        
+        finalHtml += newColumnBtn;
         finalHtml += container;
         finalHtml += columns;
+
+        // insert cards in each column
         finalHtml += cards;
         finalHtml += `</div>`;
         finalHtml += `</div>`;
 
         return finalHtml;
+
+}
+
+function insertVideosInColumns(videos, columnName) {
+        // find column
+        // 
+        //
+        let columns = getLocalStorage('zen-options');
+
+        videos.forEach((video) => {
+                    
+
+        });
 
 }
 
@@ -454,13 +631,8 @@ function process() {
 }
 
 function replaceHTMLContent(originalHtml, customHTML) {    
-        // var setHiddenPageManager = document.querySelector("ytd-app")
-        //     .querySelector("#content")
-        //     .querySelector("ytd-page-manager");
-        // setHiddenPageManager.style.visibility = "visible";
         originalHtml.innerHTML = "";
         originalHtml.innerHTML = customHTML;
-
 }
 
 function checkClickEvent(event){    
@@ -468,14 +640,61 @@ function checkClickEvent(event){
         console.log("Subscription menu button was clicked!!!!");
         //process();
     }
+
+    if(event.srcElement.className === "categorySelection") {
+       
+        let channelName = event.srcElement.parentNode.parentNode.parentNode.children[0].children[1].children[2].textContent;
+
+        updateChannelCategoryDOM(event, channelName);
+
+        setChannelCategory({
+            name: channelName,
+            category: event.target.textContent
+        });
+
+    }
+
+    if(event.target.className === "new-column-btn") {
+        console.log("creating a new column");
+        createNewColumn(event.target.textContent);
+    }
+
+    if(event.target.innerTEXT !== "Select Category ( ͡° ͜ʖ ͡°)" && event.srcElement.className === "categorySelection"){
+        console.log("updating category");
+        insertNewColumnOptionStorage({ name: event.target.innerHTML });
+    }
+}
+
+
+function createNewColumn(columnName) {
+    let container = document.getElementsByClassName("scrollable-container")[0];
+    let newColumn = columnsCreation(true);
+
+    container.insertAdjacentHTML("beforeend", newColumn);
+
+}
+
+function insertNewColumnOptionStorage(column) {
+    let optionsStorage = getLocalStorage('zen-options');
+    if(optionsStorage){
+        if(optionsStorage.columns) {
+            column.order = optionsStorage.columns.length + 1;
+            optionsStorage.columns.push(column);
+        } else {
+            optionsStorage.columns = [];
+            column.order = 2;
+            optionsStorage.columns.push(column);
+        }
+
+    }
+    
+    setStorage(optionsStorage, 'zen-options');
 }
 
 function checkExtension() {
     let extension = localStorage.getItem("zen-options");
     if(extension){
         let options = JSON.parse(extension);
-        console.log("BBBBBBBBBBBBBBBBBBBBBBBBBBBB");
-        console.log(options);
         return options;
     }
 
@@ -496,9 +715,6 @@ function setExtensionOption() {
         newOptions = options;
     }
 
-
-    console.log("AAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-    console.log(newOptions);
     localStorage.setItem('zen-options', JSON.stringify(newOptions));
     
     return forceReloadWindow;
@@ -522,10 +738,6 @@ const observer = new MutationObserver((mutations) => {
                                 .querySelector("#primary");
         
         const primaryObserver = new MutationObserver((mutationsSubscription) => {            
-            // var setHiddenPageManager = document.querySelector("ytd-app")
-            //             .querySelector("#content")
-            //             .querySelector("ytd-page-manager");
-            // setHiddenPageManager.style.visibility = "hidden";
             console.log("[LOGGER] PRIMARY_DOM CHANGE DETECTED");       
             const contentDOM = document.querySelector("ytd-app")
                                         .querySelector("#content")
@@ -565,4 +777,5 @@ observer.observe(targetElement, config_observer);
 
 document.addEventListener("mouseup", checkClickEvent);
 browser.runtime.onMessage.addListener(listingBackgroundScript);
+
 })();
