@@ -52,10 +52,6 @@ function listenForClicks() {
                 categoriesScreen.style.visibility = categories;       
         }
 
-        function backToHome() {
-                showHomeScreen();
-        }
-
         function addCategory(tabs){
                 let homeScreen = document.getElementById("homeScreen");
                 homeScreen.style.visibility = "hidden";
@@ -71,6 +67,10 @@ function listenForClicks() {
                     .then(() => {
                         showHomeScreen();
                     });
+        }
+        
+        function backToHome() {
+            showHomeScreen();
         }
 
         if(e.target.textContent.toUpperCase() === "ZEN"){

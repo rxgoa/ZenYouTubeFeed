@@ -1,4 +1,4 @@
-(function() {
+(function () {
 
 
     // this will prevent for this script to be injected more than one time.
@@ -10,19 +10,24 @@
 
     window.hasRun = true;
 
-    console.log("\n\ncontent_script loaded!!\n\n");
+    console.log("[LOGGER]CONTENT_SCRIPT LOADED.");
+
+    /**
+     * 
+     * 
+     * LISTENERS GOES HERE
+     * 
+     * 
+     */
 
     function listingBackgroundScript(message, sender, response) {
-
         if (message.type === "REQUESTED_DOM_INFO") {
-            console.log(`Background Script requested DOM info..`);
             process();
             //browser.runtime.sendMessage({ type: "USER_ACTION_FULFILLED" })
         }
 
         if (message.type === "EXTENSION_OPTION_CHANGED") {
             let shouldReloadWindow = setExtensionOption();
-            console.log("Updating extension options..");
 
             if (shouldReloadWindow) {
                 location.reload();
@@ -41,7 +46,6 @@
         }
 
         if (message.type === "OPTIONS_STORAGE_CATEGORIES_UPDATED") {
-            console.log("updating local storage for categories...");
             let localStorage = getLocalStorage('zen-options');
             if (localStorage.categories) {
                 localStorage.categories.push(message.data);
@@ -53,7 +57,22 @@
             setStorage(localStorage, 'zen-options');
 
         }
+
+        if(message.type === "YOUTUBE_FEED_SUBSCRIPTION_PAGE") {
+            console.log("[LOGGER] YOUTUBE_FEED_SUBSCRIPTION_PAGE");
+            console.log(message);
+            customVideoPlayer();
+        }
+
     }
+
+    /**
+     * 
+     * SCRIPT_LOGIC GOES HERE.
+     * THIS IS THE PLACE WHERE ALL THE LOGIC BEHIND THE EXTENSION HAPPENS.
+     * MAIN FUNCTIONS
+     * 
+     */
 
     function getVideos() {
         // responsible for getting an list of rows
@@ -99,8 +118,6 @@
 
         }
 
-        // in here i would create a logic to separete videos by category. Science, Vlogs etc
-        function configureByCategory() { }
         var rows = getRows();
         var videosList = getVideosFromRowList(rows);
         var videosListWithImages = checkIfImageExist(videosList);
@@ -109,25 +126,13 @@
 
     }
 
-    function setChannelsCache(videos) {
-        var localStorage = getLocalStorage('zen-youtube-feed');
-        videos.forEach(video => {
-            var checkChannel = localStorage.findIndex(channel => channel.channel_url === video.channel_url);
-            if (checkChannel === -1) {
-                if (video.channel_image !== "") {
-                    localStorage.push({
-                        name: video.channel_name,
-                        image_url: video.channel_image,
-                        channel_url: video.channel_url
-                    });
-                }
-            }
-        });
-
-        setStorage(localStorage, 'zen-youtube-feed');
-
-    }
-
+    /**
+     * 
+     * 
+     * LOCAL_STORAGE GOES HERE
+     * 
+     * 
+     */    
     function checkIfImageExist(videos) {
         var localStorage = getLocalStorage('zen-youtube-feed');
 
@@ -148,18 +153,33 @@
         return videos;
 
     }
+    
+    function checkExtension() {
+        let extension = localStorage.getItem("zen-options");
+        if (extension) {
+            let options = JSON.parse(extension);
+            return options;
+        }
+        return {};
+    }
 
-    function updateChannelCategoryDOM(event, channelName) {
-        event.srcElement.parentNode.parentNode.children[0].innerHTML = `<button class="dropbtn">${event.target.textContent}</button>`;
-        // update localStorage channel
-        let allChannelVideos = Array.from(document.getElementsByClassName("card-channel"));
-
-
-        let onlyCurrentChannelVideos = allChannelVideos.filter(video => video.textContent === channelName);
-        onlyCurrentChannelVideos.forEach((channel) => {
-            //channel.parentNode.parentNode.parentNode.children[1].children[1]
-            channel.parentNode.parentNode.parentNode.children[1].children[0].innerHTML = `<button class="dropbtn">${event.target.textContent}</button>`;
-        });
+    function insertNewColumnOptionStorage(column) {
+        let optionsStorage = getLocalStorage('zen-options');
+        if (optionsStorage) {
+            if (optionsStorage.columns) {
+                column.order = optionsStorage.columns.length + 1;
+                // checks if column already exists in config storage 
+                let checkIfAlreadyExist = optionsStorage.columns.filter(storageColumn => storageColumn.name === column.name);
+                if (checkIfAlreadyExist.length === 0) {
+                    optionsStorage.columns.push(column);
+                }
+            } else {
+                optionsStorage.columns = [];
+                column.order = 2;
+                optionsStorage.columns.push(column);
+            }
+        }
+        setStorage(optionsStorage, 'zen-options');
     }
 
     function setChannelCategory(updatedChannel) {
@@ -191,6 +211,46 @@
         }
     }
 
+    function setChannelsCache(videos) {
+        var localStorage = getLocalStorage('zen-youtube-feed');
+        videos.forEach(video => {
+            var checkChannel = localStorage.findIndex(channel => channel.channel_url === video.channel_url);
+            if (checkChannel === -1) {
+                if (video.channel_image !== "") {
+                    localStorage.push({
+                        name: video.channel_name,
+                        image_url: video.channel_image,
+                        channel_url: video.channel_url
+                    });
+                }
+            }
+        });
+
+        setStorage(localStorage, 'zen-youtube-feed');
+
+    }
+
+    /**
+     * 
+     * 
+     * HTML DOM MANIPULATION GOES HERE.
+     * 
+     * 
+     */
+
+    function updateChannelCategoryDOM(event, channelName) {
+        event.srcElement.parentNode.parentNode.children[0].innerHTML = `<button class="dropbtn">${event.target.textContent}</button>`;
+        // update localStorage channel
+        let allChannelVideos = Array.from(document.getElementsByClassName("card-channel"));
+
+
+        let onlyCurrentChannelVideos = allChannelVideos.filter(video => video.textContent === channelName);
+        onlyCurrentChannelVideos.forEach((channel) => {
+            //channel.parentNode.parentNode.parentNode.children[1].children[1]
+            channel.parentNode.parentNode.parentNode.children[1].children[0].innerHTML = `<button class="dropbtn">${event.target.textContent}</button>`;
+        });
+    }
+
     function containerCreation() {
         var htmlContainer = '';
         htmlContainer += `<div class="scrollable-container">`;
@@ -198,7 +258,24 @@
         return htmlContainer;
     }
 
-    // when implementa more than one column, im going to need to think better about how to close divs.
+    function setExtensionOption() {
+        var options = checkExtension();
+        var forceReloadWindow = false;
+        var newOptions = {};
+        if (options && options.isEnable) {
+            options.isEnable = false;
+            forceReloadWindow = true;
+            newOptions = options;
+        } else {
+            options.isEnable = true;
+            newOptions = options;
+        }
+
+        localStorage.setItem('zen-options', JSON.stringify(newOptions));
+
+        return forceReloadWindow;
+    }
+    
     function columnsCreation(isNew) {
         let columns = getLocalStorage('zen-options');
 
@@ -232,8 +309,7 @@
             let videos = getVideos();
             if (columns.columns) {
                 let videosWithoutCategory = videos.filter(video => !video.category || video.category === "");
-                console.log("videos without category");
-                console.log(videosWithoutCategory);
+                
                 title("_feed_", videosWithoutCategory);
 
                 columns.columns.forEach((column) => {
@@ -243,12 +319,9 @@
                     dropdown({ category: column.name });
                     loadCategory();
 
+                    let videosWithCategory = videos.filter(video => video.category);                
 
-                    let videosWithCategory = videos.filter(video => video.category);
-                    console.log("video with category");
-                    console.log(videosWithCategory);
-
-                    videosWithCategory.forEach((video, index) => {
+                    videosWithCategory.forEach((video) => {
                         if (video.category === column.name) {
                             var card = cardsCreation(video);
                             htmlColumn += card;
@@ -331,7 +404,6 @@
                     <a class="categorySelection">${category.name}</a>
                `;
             }
-
         });
 
         htmlCard += "</div>";
@@ -340,234 +412,7 @@
         return htmlCard;
     }
 
-    function styleCreation() {
-        var htmlStyle = '';
-        htmlStyle += `
-    <style>
-  body {
-    margin: 0;
-    overflow: auto;
-    background-color: white;
-  }
-
-  .scrollable-container {
-    display: flex;
-    overflow-x: scroll;
-    white-space: nowrap;
-    width: 100%;
-    padding: 20px;    
-    height: 88vh;
-    scrollbar-color: #D22B2B #F6FBFC;
-    scrollbar-width: auto;
-  }
-  .new-column {
-    width: 300px;
-    height: 30px;
-    padding: 20px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
-  .column {
-    flex-shrink: 0;
-    width: 300px; /* Set your preferred column width */
-    margin-right: 20px; /* Adjust spacing between columns */
-    background-color: rgba(244, 251, 252, 0.8);
-    border: rgba(182, 175, 172, 0.03) 3px solid;
-    border-radius: 8px;
-    padding: 20px;
-    overflow-y: scroll;
-    scrollbar-color: #D22B2B #F6FBFC;
-    scrollbar-width: thin;
-  }
-
-  .card {    
-    border-radius: 8px;
-    padding: 10px;
-    min-height: 60px;
-    max-height: 98px;
-    margin-bottom: 20px; /* Adjust spacing between cards */
-    box-shadow: 0 0 14px rgba(0, 0, 0, 0.04);
-    background-color: #fff;
-    /* Add more styling as needed */
-  }
-
-.pill {
-    display: inline-block; /* Allows us to set padding and makes the element behave more like a block while staying in-line */
-    padding: 4px 10px; /* Adjusts the size of the pill, increase or decrease as needed */
-    color: black; /* Sets the text color */
-    font-size: 8px; /* Sets the size of the text */
-    margin-top: 10px;
-    border-radius: 50px; /* Creates the rounded corners. A large value ensures fully rounded ends */
-    text-align: center; /* Ensures the text is centered within the pill */
-    background-color: #FFDFD3;
-}
-
-.dropdown {
-  position: relative;
-  display: inline-block;
-  margin-top: 5px;
-  margin-bottom: 20px;
-}
-
-/* Button styling */
-.dropbtn {
-  background-color: #FFDFD3;
-  color: #333;
-  padding: 8px 16px;
-  font-size: 10px;
-  font-weight: bold;
-  border: none;
-  cursor: pointer;
-  border-radius: 20px; /* Pill-style button */
-}
-
-.new-column-load-btn {
-  background-color: #D22B2B;
-  color: white;
-  border: none;
-  padding: 8px 10px;
-  font-size: 10px;
-  font-weight: bold;
-  margin-left: 10px;
-  border-radius: 5px;
-  cursor: pointer;
-  outline: none;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-.new-column-load-btn:hover {
-  background-color: #c11a1a;
-  transform: translateY(-2px);
-}
-
-.new-column-load-btn:active {
-  transform: translateY(1px);
-}
-
-.dropdown-content {
-  display: none;
-  position: absolute;
-  background-color: #f9f9f9;
-  min-width: 30px;
-  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-  z-index: 1;
-}
-
-.dropdown-content a {
-  color: black;
-  padding: 10px 16px;
-  text-decoration: none;
-  display: block;
-}
-
-.dropdown-content a:hover {background-color:#D22B2B; color: white;}
-
-.dropdown:hover .dropdown-content {display: block}
-
-.dropdown:hover .dropbtn {background-color: #D22B2B;}
-
-  .column a {
-    text-decoration: none;
-  }
-
-  .column-title {
-    font-size: 18px;
-    margin-bottom: 30px;
-    text-align: center;
-    color: #151922;
-  }
-
- .categorySelection {
-    cursor: pointer;
- }
-
-  .card-image {
-    border-radius: 6px;
-    overflow: hidden;
-    width: 50px; /* Set your preferred image size */
-    height: 50px; /* Set your preferred image size */
-    float: left;
-    position: relative;
-    margin-right: 10px;
-  }
-
-  .centered-image {
-    display: block;
-    width: 100%;
-    height: auto;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-  }
-
-  .card-content {
-    overflow: hidden; /* Clearfix for the floated elements */
-  }
-
-  .card-title {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    margin-bottom: 10px;
-    white-space: normal;
-    height: 40px;
-    font-size: 12px;
-    text-overflow: ellipsis;
-    overflow: hidden;
-  }
-
-.new-column-btn {
-  background-color: #D22B2B;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  font-size: 16px;
-  font-weight: bold;
-  border-radius: 5px;
-  cursor: pointer;
-  outline: none;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-.new-column-btn:hover {
-  background-color: #c11a1a;
-  transform: translateY(-2px);
-}
-
-.new-column-btn:active {
-  transform: translateY(1px);
-}
-  .card-time,
-  .card-channel {
-    width: 50%;
-    box-sizing: border-box;
-    float: left;
-    font-weight: bold;
-    color: #D22B2B;
-    font-size: 10px;
-  }
-
-  .card-time {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 100px;
-  }
-
-  .card-channel {
-    float: right;
-    text-align: right;      
-  }
-</style>
-    `;
-
-        return htmlStyle;
-    }
-
     function orchestradeCreation(videos) {
-
         var finalHtml = '';
         var cards = '';
 
@@ -575,8 +420,6 @@
         var container = containerCreation();
         var newColumnBtn = `<div class="new-column"><button class="new-column-btn">New column</button></div>`;
         var columns = columnsCreation();
-
-
 
         finalHtml += style;
         finalHtml += newColumnBtn;
@@ -592,44 +435,13 @@
 
     }
 
-    function insertVideosInColumns(videos, columnName) {
-        // find column
-        // 
-        //
-        let columns = getLocalStorage('zen-options');
-
-        videos.forEach((video) => {
-
-
-        });
-
-    }
-
-    function process() {
-        setTimeout(() => {
-            var videos = getVideos();
-            // set cache of channels
-            setChannelsCache(videos);
-
-            var customHtml = orchestradeCreation(videos);
-            var originalHtml = document.querySelector(`[page-subtype="subscriptions"]`);
-            replaceHTMLContent(originalHtml, customHtml);
-        }, 100);
-    }
-
     function replaceHTMLContent(originalHtml, customHTML) {
         originalHtml.innerHTML = "";
         originalHtml.innerHTML = customHTML;
     }
 
     function checkClickEvent(event) {
-        if (event.target.innerText === "Subscriptions") {
-            console.log("Subscription menu button was clicked!!!!");
-            //process();
-        }
-
         if (event.srcElement.className === "categorySelection") {
-
             let channelName = event.srcElement.parentNode.parentNode.parentNode.children[0].children[1].children[2].textContent;
 
             updateChannelCategoryDOM(event, channelName);
@@ -638,20 +450,17 @@
                 name: channelName,
                 category: event.target.textContent
             });
-
         }
 
         if (event.target.className === "new-column-btn") {
-            console.log("creating a new column");
             createNewColumn(event.target.textContent);
         }
 
         if (event.target.innerTEXT !== "Select Category ( ͡° ͜ʖ ͡°)" && event.srcElement.className === "categorySelection") {
-            console.log("updating category");
             insertNewColumnOptionStorage({ name: event.target.innerHTML });
         }
-    }
 
+    }
 
     function createNewColumn(columnName) {
         let container = document.getElementsByClassName("scrollable-container")[0];
@@ -659,56 +468,6 @@
 
         container.insertAdjacentHTML("beforeend", newColumn);
 
-    }
-
-    function insertNewColumnOptionStorage(column) {
-        let optionsStorage = getLocalStorage('zen-options');
-        if (optionsStorage) {
-            if (optionsStorage.columns) {
-                column.order = optionsStorage.columns.length + 1;
-                // checks if column already exists in config storage 
-                let checkIfAlreadyExist = optionsStorage.columns.filter(storageColumn => storageColumn.name === column.name);
-                if (checkIfAlreadyExist.length === 0) {
-                    optionsStorage.columns.push(column);
-                }
-            } else {
-                optionsStorage.columns = [];
-                column.order = 2;
-                optionsStorage.columns.push(column);
-            }
-
-        }
-
-        setStorage(optionsStorage, 'zen-options');
-    }
-
-    function checkExtension() {
-        let extension = localStorage.getItem("zen-options");
-        if (extension) {
-            let options = JSON.parse(extension);
-            return options;
-        }
-
-        return {};
-
-    }
-
-    function setExtensionOption() {
-        var options = checkExtension();
-        var forceReloadWindow = false;
-        var newOptions = {};
-        if (options && options.isEnable) {
-            options.isEnable = false;
-            forceReloadWindow = true;
-            newOptions = options;
-        } else {
-            options.isEnable = true;
-            newOptions = options;
-        }
-
-        localStorage.setItem('zen-options', JSON.stringify(newOptions));
-
-        return forceReloadWindow;
     }
 
     const targetElement = document.querySelector("ytd-app")
@@ -753,10 +512,247 @@
                 primaryObserver.observe(primaryDOM, { childList: true, attributeOldValue: true })
 
             }
-
+         
         }
-
     });
+
+    // main function    
+    function process() {
+        setTimeout(() => {
+            var videos = getVideos();
+            // set cache of channels
+            setChannelsCache(videos);
+            var customHtml = orchestradeCreation(videos);
+            var originalHtml = document.querySelector(`[page-subtype="subscriptions"]`);
+            replaceHTMLContent(originalHtml, customHtml);
+        }, 100);
+    }
+
+    function styleCreation() {
+        var htmlStyle = '';
+        htmlStyle += `
+        <style>
+    body {
+        margin: 0;
+        overflow: auto;
+        background-color: white;
+    }
+
+    .scrollable-container {
+        display: flex;
+        overflow-x: scroll;
+        white-space: nowrap;
+        width: 100%;
+        padding: 20px;    
+        height: 88vh;
+        scrollbar-color: #D22B2B #F6FBFC;
+        scrollbar-width: auto;
+    }
+    .new-column {
+        width: 300px;
+        height: 30px;
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .column {
+        flex-shrink: 0;
+        width: 300px; /* Set your preferred column width */
+        margin-right: 20px; /* Adjust spacing between columns */
+        background-color: rgba(244, 251, 252, 0.8);
+        border: rgba(182, 175, 172, 0.03) 3px solid;
+        border-radius: 8px;
+        padding: 20px;
+        overflow-y: scroll;
+        scrollbar-color: #D22B2B #F6FBFC;
+        scrollbar-width: thin;
+    }
+
+    .card {    
+        border-radius: 8px;
+        padding: 10px;
+        min-height: 60px;
+        max-height: 98px;
+        margin-bottom: 20px; /* Adjust spacing between cards */
+        box-shadow: 0 0 14px rgba(0, 0, 0, 0.04);
+        background-color: #fff;
+        /* Add more styling as needed */
+    }
+
+    .pill {
+        display: inline-block; /* Allows us to set padding and makes the element behave more like a block while staying in-line */
+        padding: 4px 10px; /* Adjusts the size of the pill, increase or decrease as needed */
+        color: black; /* Sets the text color */
+        font-size: 8px; /* Sets the size of the text */
+        margin-top: 10px;
+        border-radius: 50px; /* Creates the rounded corners. A large value ensures fully rounded ends */
+        text-align: center; /* Ensures the text is centered within the pill */
+        background-color: #FFDFD3;
+    }
+
+    .dropdown {
+    position: relative;
+    display: inline-block;
+    margin-top: 5px;
+    margin-bottom: 20px;
+    }
+
+    /* Button styling */
+    .dropbtn {
+    background-color: #FFDFD3;
+    color: #333;
+    padding: 8px 16px;
+    font-size: 10px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    border-radius: 20px; /* Pill-style button */
+    }
+
+    .new-column-load-btn {
+    background-color: #D22B2B;
+    color: white;
+    border: none;
+    padding: 8px 10px;
+    font-size: 10px;
+    font-weight: bold;
+    margin-left: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    outline: none;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .new-column-load-btn:hover {
+    background-color: #c11a1a;
+    transform: translateY(-2px);
+    }
+
+    .new-column-load-btn:active {
+    transform: translateY(1px);
+    }
+
+    .dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    min-width: 30px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+    }
+
+    .dropdown-content a {
+    color: black;
+    padding: 10px 16px;
+    text-decoration: none;
+    display: block;
+    }
+
+    .dropdown-content a:hover {background-color:#D22B2B; color: white;}
+
+    .dropdown:hover .dropdown-content {display: block}
+
+    .dropdown:hover .dropbtn {background-color: #D22B2B;}
+
+    .column a {
+        text-decoration: none;
+    }
+
+    .column-title {
+        font-size: 18px;
+        margin-bottom: 30px;
+        text-align: center;
+        color: #151922;
+    }
+
+    .categorySelection {
+        cursor: pointer;
+    }
+
+    .card-image {
+        border-radius: 6px;
+        overflow: hidden;
+        width: 50px; /* Set your preferred image size */
+        height: 50px; /* Set your preferred image size */
+        float: left;
+        position: relative;
+        margin-right: 10px;
+    }
+
+    .centered-image {
+        display: block;
+        width: 100%;
+        height: auto;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+
+    .card-content {
+        overflow: hidden; /* Clearfix for the floated elements */
+    }
+
+    .card-title {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        margin-bottom: 10px;
+        white-space: normal;
+        height: 40px;
+        font-size: 12px;
+        text-overflow: ellipsis;
+        overflow: hidden;
+    }
+
+    .new-column-btn {
+    background-color: #D22B2B;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+    outline: none;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .new-column-btn:hover {
+    background-color: #c11a1a;
+    transform: translateY(-2px);
+    }
+
+    .new-column-btn:active {
+    transform: translateY(1px);
+    }
+    .card-time,
+    .card-channel {
+        width: 50%;
+        box-sizing: border-box;
+        float: left;
+        font-weight: bold;
+        color: #D22B2B;
+        font-size: 10px;
+    }
+
+    .card-time {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: 100px;
+    }
+
+    .card-channel {
+        float: right;
+        text-align: right;      
+    }
+    </style>
+    `;
+
+        return htmlStyle;
+    }
 
     const config_observer = { childList: true, attributeOldValue: true };
 
